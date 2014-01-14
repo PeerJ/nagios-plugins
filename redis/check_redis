@@ -3,11 +3,11 @@
 use warnings;
 use strict;
 use Getopt::Long qw(:config gnu_getopt);
-use Redis;
+use RedisDB;
 use Nagios::Plugin;
 use Data::Dumper;
 
-my $VERSION="0.1";
+my $VERSION="0.2";
 my $np;
 
 $np = Nagios::Plugin->new(usage => "Usage: %s [--host|-H <host>] [--port|-p <port>] [ -c|--critical=<threshold> ] [ -w|--warning=<threshold>] [-?|--usage] [-V|--version] [-h|--help] [-v|--verbose] [-t|--timeout=<timeout>] [ -k|--nkeyswarning=<threshold> ] [ -K|--nkeyscritical=<threshold> ]",
@@ -54,6 +54,11 @@ $np->add_arg(spec => 'nkeyscritical|K=s',
              default => 1.0,
             );
 
+$np->add_arg(spec => 'password|P=s',
+             help => q(Use Password),
+             required => 0,
+             default => undef,
+            );
 $np->getopts;
 my $ng = $np->opts;
 
@@ -67,12 +72,11 @@ my $port = $ng->get('port');
 # verbosity
 my $verbose = $ng->get('verbose');
 
-my $redis;
-eval {
-	$redis = Redis->new( server => "$host:$port", debug => 0);
-};
-if ($@) {
-	$np->nagios_exit( CRITICAL, "Can't connect to $host:$port" );
+my $redis = RedisDB->new( host => "$host", port => "$port");
+
+my $password = $ng->get('password');
+if ($password) {
+  	$redis->auth($password);
 }
 
 my $info = $redis->info();
@@ -130,13 +134,11 @@ if ($info->{'role'} eq "slave") {
 				# only check online slaves
 				if ( "$slave_status" eq "online" ) {
 					# connect to slave
-					my $redis_slave;
-					eval {
-						$redis_slave = Redis->new( server => "$slave_ip:$port", debug => 0);
-					};
-					if ($@) {
-						$np->nagios_exit( CRITICAL, "Can't connect to $slave_ip:$port" );
-					}
+                                        my $redis_slave = RedisDB->new( host => "$slave_ip", port => "$port");
+                                        if ($password) {
+                                         	$redis_slave->auth($password);
+                                        }
+
 					$redis_slave->ping || $np->nagios_exit( CRITICAL, "Can't ping server $slave_ip:$port" );
 
 					# get slave redis info
