@@ -112,6 +112,8 @@ if ($info->{'role'} eq "slave") {
 		for (my $count = 0; $count < $info->{'connected_slaves'} ; $count++) {
 			$msg .= " ".$info->{"slave$count"}
 		}
+	} else {
+		$code = CRITICAL;
 	}
 
 	# Check number of keys on all slaves in all dbs present on the master - if replication is OK the number must be the same
